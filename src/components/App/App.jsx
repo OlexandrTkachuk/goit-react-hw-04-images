@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Container } from './App.styled';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -9,152 +9,109 @@ import { Modal } from 'components/Modal/Modal';
 import { fetchPixabay } from 'services/pixabay-api';
 import { Circles } from 'react-loader-spinner';
 
-export class App extends Component {
-  state = {
-    searchQuery: '',
-    loadedImages: [],
-    page: 1,
-    error: null,
-    status: 'idle',
-    isModalOpen: false,
-    imageInModal: {
-      link: '',
-      alt: '',
+export const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loadedImages, setLoadedImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imageInModal, setImageInModal] = useState({ link: '', alt: '' });
+  const [totalPages, setTotalPages] = useState(0);
+
+  const showNotification = useCallback(
+    data => {
+      if (page === 1) {
+        data.hits.length > 0
+          ? toast.success(`Wow! We found ${data.total} results`)
+          : toast.warn(`Sorry, but there are no results for your query`);
+      }
     },
-    totalPages: 0,
-  };
+    [page]
+  );
 
-  componentDidUpdate = (_, prevState) => {
-    const { page, loadedImages, searchQuery } = this.state;
-    const prevQueryValue = prevState.searchQuery;
-    const currentQueryValue = searchQuery;
-
-    if (prevQueryValue !== currentQueryValue || prevState.page !== page) {
+  useEffect(() => {
+    if (searchQuery !== '') {
       try {
-        this.setState({ status: 'pending' });
+        setIsLoading(true);
 
         fetchPixabay(searchQuery, page).then(data => {
-          this.showNotification(data);
-
-          this.setState({
-            loadedImages: [...loadedImages, ...data.hits],
-            status: 'resolved',
-            totalPages: Math.floor(data.totalHits / 12),
-          });
+          setLoadedImages(prev => [...prev, ...data.hits]);
+          showNotification(data);
+          setTotalPages(Math.floor(data.totalHits / 12));
+          setIsLoading(false);
         });
       } catch (error) {
-        this.setState({ error: true });
-
-        toast.error('Oops, something went wrong :(');
-
+        toast.error('Ooops, something went wrong :(');
         console.log(error);
       }
     }
-  };
+  }, [page, searchQuery, showNotification]);
 
-  showNotification = data => {
-    if (this.state.page === 1) {
-      data.hits.length > 0
-        ? toast.success(`Wow! We found ${data.total} results!`)
-        : toast.warn(`Sorry, but there are no results for your query`);
+  const handleFormSubmit = inputValue => {
+    if (searchQuery !== inputValue) {
+      setSearchQuery(inputValue);
+      setLoadedImages([]);
+      setPage(1);
     }
   };
 
-  handleFormSubmit = inputValue => {
-    this.setState({ searchQuery: inputValue, loadedImages: [], page: 1 });
+  const handleLoadMoreClick = () => {
+    setPage(prev => prev + 1);
   };
 
-  handleLoadMoreClick = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
-  };
-
-  handleImageClick = image => {
+  const handleImageClick = image => {
     const { largeImageURL, tags } = image;
 
-    this.setState({
-      status: 'pending',
-      isModalOpen: true,
-      imageInModal: {
-        link: largeImageURL,
-        alt: tags,
-      },
-    });
+    setIsLoading(true);
+    setIsModalOpen(true);
+    setImageInModal({ link: largeImageURL, alt: tags });
   };
 
-  handleModalImageLoaded = () => {
-    this.setState({ status: 'resolved' });
+  const handleModalImageLoaded = () => {
+    setIsLoading(false);
   };
 
-  handleModalClose = () => {
-    this.setState({ isModalOpen: false });
+  const handleModalClose = () => {
+    setIsModalOpen(false);
   };
 
-  render() {
-    const {
-      loadedImages,
-      status,
-      searchQuery,
-      isModalOpen,
-      imageInModal,
-      totalPages,
-      page,
-    } = this.state;
+  return (
+    <Container>
+      <Searchbar onSubmit={handleFormSubmit} />
 
-    return (
-      <Container>
-        <Searchbar onSubmit={this.handleFormSubmit} />
+      <ImageGallery
+        loadedImages={loadedImages}
+        onClick={handleImageClick}
+      ></ImageGallery>
 
-        {status === 'idle' && (
-          <div style={{ textAlign: 'center' }}>
-            Введіть текст для пошуку зображення
-          </div>
-        )}
+      {isLoading && (
+        <Circles
+          height="80"
+          width="80"
+          color="#4fa94d"
+          ariaLabel="circles-loading"
+          wrapperStyle={{
+            display: 'block',
+            margin: '0 auto ',
+          }}
+          wrapperClass=""
+          visible={true}
+        />
+      )}
 
-        <ImageGallery
-          loadedImages={loadedImages}
-          onClick={this.handleImageClick}
-        ></ImageGallery>
+      {loadedImages.length > 0 && !isLoading && page <= totalPages && (
+        <Button text="Load more" onClick={handleLoadMoreClick}></Button>
+      )}
 
-        {status === 'pending' && (
-          <Circles
-            height="80"
-            width="80"
-            color="#4fa94d"
-            ariaLabel="circles-loading"
-            wrapperStyle={{
-              display: 'block',
-              margin: '0 auto ',
-            }}
-            wrapperClass=""
-            visible={true}
-          />
-        )}
+      {isModalOpen && (
+        <Modal
+          image={imageInModal}
+          onClose={handleModalClose}
+          onLoad={handleModalImageLoaded}
+        ></Modal>
+      )}
 
-        {status === 'rejected' && (
-          <div>
-            <p>Пошук за значенням {searchQuery} не дав результату</p>
-          </div>
-        )}
-
-        {loadedImages.length > 0 &&
-          status !== 'pending' &&
-          page <= totalPages && (
-            <Button
-              text="Load more"
-              onClick={this.handleLoadMoreClick}
-            ></Button>
-          )}
-
-        {isModalOpen && (
-          <Modal
-            image={imageInModal}
-            onClose={this.handleModalClose}
-            onLoad={this.handleModalImageLoaded}
-          ></Modal>
-        )}
-
-        <ToastContainer />
-      </Container>
-    );
-  }
-}
+      <ToastContainer />
+    </Container>
+  );
+};

@@ -3,6 +3,7 @@ import { GalleryItem, GalleryItemImage } from './ImageGalleryItem.styled';
 
 export const ImageGalleryItem = ({ image, onClick }) => {
   const { webformatURL, tags } = image;
+  
   return (
     <GalleryItem>
       <GalleryItemImage
