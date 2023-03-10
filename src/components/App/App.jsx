@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Container } from './App.styled';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -18,18 +18,15 @@ export const App = () => {
   const [imageInModal, setImageInModal] = useState({ link: '', alt: '' });
   const [totalPages, setTotalPages] = useState(0);
 
-  const showNotification = useCallback(
-    data => {
+  useEffect(() => {
+    const showNotification = data => {
       if (page === 1) {
         data.hits.length > 0
           ? toast.success(`Wow! We found ${data.total} results`)
           : toast.warn(`Sorry, but there are no results for your query`);
       }
-    },
-    [page]
-  );
+    };
 
-  useEffect(() => {
     if (searchQuery !== '') {
       try {
         setIsLoading(true);
@@ -45,7 +42,7 @@ export const App = () => {
         console.log(error);
       }
     }
-  }, [page, searchQuery, showNotification]);
+  }, [page, searchQuery]);
 
   const handleFormSubmit = inputValue => {
     if (searchQuery !== inputValue) {
